@@ -1,0 +1,50 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -switch /Applications/Xcode_15.4.app
+
+      - name: Resolve Swift Package Manager Dependencies
+        run: |
+          cd DailyPulse
+          xcodebuild -resolvePackageDependencies -project DailyPulse.xcodeproj -scheme DailyPulse
+
+      - name: Build iOS Application (Unsigned)
+        run: |
+          cd DailyPulse
+          xcodebuild clean build \
+            -project DailyPulse.xcodeproj \
+            -scheme DailyPulse \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            BUILD_DIR="../build"
+
+      - name: Package into IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/Release-iphoneos/DailyPulse.app Payload/
+          zip -r DailyPulse.ipa Payload
+          ls -lh DailyPulse.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DailyPulse-iOS-IPA
+          path: DailyPulse.ipa
+          retention-days: 14
