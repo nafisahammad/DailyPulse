@@ -37,7 +37,7 @@ public final class FirestoreService: FirestoreServiceProtocol {
                 .document(record.id)
 
             try await docRef.setData(record.dictionaryRepresentation, merge: true)
-            print("☁️ [Firestore] Successfully saved record for \(record.id)")
+            print("☁️ [Firestore] Successfully saved/updated record for \(record.id)")
             #endif
         }
 
@@ -58,9 +58,15 @@ public final class FirestoreService: FirestoreServiceProtocol {
                 .document(dateKey)
 
             let snapshot = try await docRef.getDocument()
-            if let data = snapshot.data(), let record = DailyRecord.from(dictionary: data) {
-                saveToLocalCache(record)
-                return record
+            if let rawData = snapshot.data() {
+                var data = rawData
+                if data["id"] == nil {
+                    data["id"] = snapshot.documentID
+                }
+                if let record = DailyRecord.from(dictionary: data) {
+                    saveToLocalCache(record)
+                    return record
+                }
             }
             #endif
         }
@@ -84,12 +90,20 @@ public final class FirestoreService: FirestoreServiceProtocol {
                 .order(by: "date", descending: true)
                 .limit(to: limitDays)
 
-            let snapshot = try await query.getDocuments()
-            records = snapshot.documents.compactMap { doc in
-                DailyRecord.from(dictionary: doc.data())
-            }
-            if !records.isEmpty {
-                return records
+            do {
+                let snapshot = try await query.getDocuments()
+                records = snapshot.documents.compactMap { doc in
+                    var data = doc.data()
+                    if data["id"] == nil {
+                        data["id"] = doc.documentID
+                    }
+                    return DailyRecord.from(dictionary: data)
+                }
+                if !records.isEmpty {
+                    return records
+                }
+            } catch {
+                print("⚠️ [Firestore] fetchHistory error: \(error.localizedDescription)")
             }
             #endif
         }

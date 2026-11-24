@@ -7,36 +7,29 @@ public struct MainTabView: View {
 
     public var body: some View {
         TabView(selection: $selectedTab) {
-            TodayDashboardView()
-                .tabItem {
-                    Label("Today", systemImage: "sparkles")
-                }
-                .tag(0)
-
             NamazTrackerView()
                 .tabItem {
-                    Label("Namaz", systemImage: "hands.sparkles.fill")
+                    Label("Namaz", systemImage: "clock.fill")
                 }
-                .tag(1)
+                .tag(0)
 
             HydrationTrackerView()
                 .tabItem {
                     Label("Hydration", systemImage: "drop.fill")
                 }
-                .tag(2)
+                .tag(1)
 
             SleepTrackerView()
                 .tabItem {
                     Label("Sleep", systemImage: "bed.double.fill")
                 }
-                .tag(3)
+                .tag(2)
 
             HistoryView()
                 .tabItem {
-                    Label("History", systemImage: "chart.bar.xaxis")
+                    Label("History", systemImage: "calendar")
                 }
-                .tag(4)
+                .tag(3)
         }
-        .accentColor(.namazPrimary)
     }
 }

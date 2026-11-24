@@ -2,7 +2,8 @@ import SwiftUI
 
 public struct NamazTrackerView: View {
     @EnvironmentObject var namazVM: NamazViewModel
-    @State private var showingLocationSheet = false
+    @EnvironmentObject var recordStore: DailyRecordStore
+    @State private var showingCitySheet = false
     @State private var customCity = ""
     @State private var customCountry = ""
 
@@ -10,163 +11,96 @@ public struct NamazTrackerView: View {
 
     public var body: some View {
         NavigationView {
-            ZStack {
-                Color.cardBackground.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Location & Date Header
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Button {
-                                    showingLocationSheet = true
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "mappin.and.ellipse")
-                                            .foregroundColor(.namazPrimary)
-                                        Text("\(namazVM.selectedCity), \(namazVM.selectedCountry)")
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.primary)
-                                        Image(systemName: "chevron.down")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-
-                                if !namazVM.gregorianDateString.isEmpty {
-                                    Text(namazVM.gregorianDateString)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-
-                            Spacer()
-
+            List {
+                // Location & Status Section
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(namazVM.selectedCity), \(namazVM.selectedCountry)")
+                                .font(.headline)
                             if !namazVM.hijriDateString.isEmpty {
                                 Text(namazVM.hijriDateString)
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(Color.namazPrimary.opacity(0.12))
-                                    .foregroundColor(.namazPrimary)
-                                    .cornerRadius(20)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
-                        .padding(.horizontal, 4)
 
-                        // Next Prayer Banner Card
-                        CardView {
+                        Spacer()
+
+                        Button("Change City") {
+                            showingCitySheet = true
+                        }
+                        .font(.subheadline)
+                    }
+
+                    HStack {
+                        Text("Next Prayer:")
+                            .foregroundColor(.secondary)
+                        Text("\(namazVM.nextPrayerName) (\(namazVM.nextPrayerTime))")
+                            .bold()
+                        Spacer()
+                        Text(namazVM.timeRemainingString)
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        ProgressView(
+                            "Completed: \(namazVM.completedCount) of 5",
+                            value: Double(namazVM.completedCount),
+                            total: 5.0
+                        )
+                    }
+                }
+
+                // Daily Prayers Section
+                Section("Today's Prayers (Check off to save)") {
+                    ForEach(PrayerType.allCases) { prayer in
+                        let isDone = namazVM.isPrayerCompleted(prayer)
+
+                        Toggle(isOn: Binding(
+                            get: { isDone },
+                            set: { _ in
+                                namazVM.togglePrayer(prayer)
+                            }
+                        )) {
                             HStack {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("UPCOMING PRAYER")
+                                Image(systemName: prayer.iconName)
+                                    .foregroundColor(isDone ? .green : .secondary)
+                                    .frame(width: 24)
+
+                                VStack(alignment: .leading) {
+                                    Text(prayer.name)
+                                        .font(.body)
+                                        .strikethrough(isDone, color: .secondary)
+
+                                    Text(prayer.arabicName)
                                         .font(.caption2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.namazPrimary)
-                                        .tracking(1)
-
-                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                        Text(namazVM.nextPrayerName)
-                                            .font(.title2)
-                                            .fontWeight(.bold)
-
-                                        Text(namazVM.nextPrayerTime)
-                                            .font(.title3)
-                                            .foregroundColor(.secondary)
-                                    }
-
-                                    Text(namazVM.timeRemainingString)
-                                        .font(.footnote)
                                         .foregroundColor(.secondary)
                                 }
 
                                 Spacer()
 
-                                ZStack {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.namazPrimary, .namazLight],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 56, height: 56)
-
-                                    Image(systemName: "clock.badge.checkmark.fill")
-                                        .font(.system(size: 26))
-                                        .foregroundColor(.white)
-                                }
-                            }
-                        }
-
-                        // Daily Progress Card
-                        CardView {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("Today's Prayers")
-                                        .font(.headline)
-
-                                    Spacer()
-
-                                    Text("\(namazVM.completedCount) of 5 Completed")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.namazPrimary)
-                                }
-
-                                LinearProgressBar(
-                                    progress: namazVM.progressFraction,
-                                    height: 10,
-                                    tintColor: .namazPrimary
-                                )
-                            }
-                        }
-
-                        // Prayers List
-                        CardView {
-                            VStack(spacing: 0) {
-                                ForEach(PrayerType.allCases) { prayer in
-                                    PrayerRowView(
-                                        prayerType: prayer,
-                                        timeString: namazVM.timeString(for: prayer),
-                                        isCompleted: namazVM.isPrayerCompleted(prayer)
-                                    ) {
-                                        withAnimation(.spring()) {
-                                            namazVM.togglePrayer(prayer)
-                                        }
-                                    }
-
-                                    if prayer != PrayerType.allCases.last {
-                                        Divider()
-                                            .padding(.leading, 60)
-                                    }
-                                }
-                            }
-                        }
-
-                        // API Error notice if any
-                        if let error = namazVM.errorMessage {
-                            HStack(spacing: 8) {
-                                Image(systemName: "info.circle")
-                                    .foregroundColor(.orange)
-                                Text(error)
-                                    .font(.caption)
+                                Text(namazVM.timeString(for: prayer))
+                                    .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
-                            .padding(.top, 4)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
                 }
-                .refreshable {
-                    await namazVM.fetchTimings()
+
+                // Firestore Sync Confirmation
+                Section {
+                    HStack {
+                        Image(systemName: "checkmark.icloud")
+                            .foregroundColor(.green)
+                        Text("Prayer checkoffs automatically sync to Firestore")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .navigationTitle("Namaz Tracker")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -178,8 +112,11 @@ public struct NamazTrackerView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingLocationSheet) {
-                locationSelectionSheet
+            .refreshable {
+                await namazVM.fetchTimings()
+            }
+            .sheet(isPresented: $showingCitySheet) {
+                citySelectionSheet
             }
             .task {
                 if namazVM.timings == nil {
@@ -190,49 +127,46 @@ public struct NamazTrackerView: View {
         .navigationViewStyle(StackNavigationViewStyle())
     }
 
-    // MARK: - Location Selection Sheet
-    private var locationSelectionSheet: some View {
+    private var citySelectionSheet: some View {
         NavigationView {
             List {
-                Section(header: Text("Popular Cities")) {
+                Section("Popular Cities") {
                     ForEach(LocationPreset.defaults) { preset in
                         Button {
                             namazVM.setLocation(city: preset.city, country: preset.country)
-                            showingLocationSheet = false
+                            showingCitySheet = false
                         } label: {
                             HStack {
                                 Text("\(preset.city), \(preset.country)")
                                     .foregroundColor(.primary)
                                 Spacer()
-                                if namazVM.selectedCity == preset.city && namazVM.selectedCountry == preset.country {
+                                if namazVM.selectedCity == preset.city {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.namazPrimary)
+                                        .foregroundColor(.blue)
                                 }
                             }
                         }
                     }
                 }
 
-                Section(header: Text("Custom Location")) {
-                    TextField("City (e.g. Chicago)", text: $customCity)
-                    TextField("Country (e.g. United States)", text: $customCountry)
+                Section("Custom City") {
+                    TextField("City name (e.g. Mecca)", text: $customCity)
+                    TextField("Country (e.g. Saudi Arabia)", text: $customCountry)
 
-                    Button("Apply Custom Location") {
-                        if !customCity.trimmingCharacters(in: .whitespaces).isEmpty &&
-                           !customCountry.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button("Set Custom City") {
+                        if !customCity.isEmpty && !customCountry.isEmpty {
                             namazVM.setLocation(city: customCity, country: customCountry)
-                            showingLocationSheet = false
+                            showingCitySheet = false
                         }
                     }
                     .disabled(customCity.isEmpty || customCountry.isEmpty)
                 }
             }
             .navigationTitle("Select City")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showingLocationSheet = false
+                    Button("Close") {
+                        showingCitySheet = false
                     }
                 }
             }
